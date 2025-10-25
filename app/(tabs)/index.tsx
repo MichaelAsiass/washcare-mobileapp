@@ -1,33 +1,27 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, Alert } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { CameraView, useCameraPermissions} from "expo-camera";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../api";
-import { Button } from "react-native";
-import { ResultCard } from "@/components/resultcard";
+import { X } from "lucide-react-native";
+import { Logo } from "@/components/logo";
+import { ResultCard } from "@/components/scanner/resultcard";
 
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scannedCode, setScannedCode] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(true);
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
-  // Query to validate QR code
   const customerData = useQuery(
     api.customer.validateQRCode,
     scannedCode ? { qrCode: scannedCode } : "skip"
   );
 
-  // Mutation to log visit
   const logVisit = useMutation(api.customer.logBayVisit);
 
-  const handleBarCodeScanned = async ({ data }: { data: string }) => {
-    if (!isScanning) return;
-    
-    setIsScanning(false);
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
     setScannedCode(data);
-
-    // Vibrate on scan
-    // Vibration.vibrate(100);
+    setIsCameraActive(false);
   };
 
   const handleLogVisit = async () => {
@@ -36,12 +30,12 @@ export default function ScanScreen() {
     try {
       await logVisit({
         customerId: customerData.customer.id as any,
-        businessId: "YOUR_BUSINESS_ID" as any, // TODO: Get from settings
+        businessId: "YOUR_BUSINESS_ID" as any,
         bayNumber: undefined,
-        wasActive: customerData.membership.isActive,
+        wasActive: customerData.membership?.isActive || false,
       });
 
-      Alert.alert("Success", "Visit logged successfully!");
+      Alert.alert("Success", "Visit logged!");
       resetScanner();
     } catch (error) {
       Alert.alert("Error", "Failed to log visit");
@@ -50,41 +44,61 @@ export default function ScanScreen() {
 
   const resetScanner = () => {
     setScannedCode(null);
-    setIsScanning(true);
   };
 
-  if (!permission) {
-    return <View />;
+  const startScanning = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) return;
+    }
+    setIsCameraActive(true);
+  };
+
+  const stopScanning = () => {
+    setIsCameraActive(false);
+  };
+
+  // Show result card if scanned
+  if (scannedCode && customerData) {
+    return (
+      <ResultCard
+        data={customerData}
+        onClose={resetScanner}
+        onLogVisit={handleLogVisit}
+      />
+    );
   }
 
-  if (!permission.granted) {
+  // Show camera if active
+  if (isCameraActive && permission?.granted) {
     return (
       <View style={styles.container}>
-        <Text style={styles.text}>We need camera permission</Text>
-        <Button onPress={requestPermission} title="Grant Permission" />
+        <CameraView
+          style={styles.camera}
+          onBarcodeScanned={handleBarCodeScanned}
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        />
+        {/* Stop button */}
+        <View style={styles.bottomButtonContainer}>
+          <TouchableOpacity style={styles.stopButton} onPress={stopScanning}>
+            <X size={24} color="#fff" />
+            <Text style={styles.stopButtonText}>Stop Scanning</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
+  // Default: Show scan button
   return (
     <View style={styles.container}>
-      {scannedCode && customerData ? (
-        <ResultCard
-          data={customerData}
-          onClose={resetScanner}
-          onLogVisit={handleLogVisit}
-        />
-      ) : (
-        <>
-          <CameraView
-            style={styles.camera}
-            onBarcodeScanned={handleBarCodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: ["qr"],
-            }}
-          />
-        </>
-      )}
+      <View style={styles.centerContent}>
+        <Logo size={120} />
+        <Text style={styles.subtitle}>Scan the QR code at the carwash</Text>
+        <TouchableOpacity style={styles.scanButton} onPress={startScanning}>
+          <Text style={styles.scanButtonText}>Start Scanning</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -92,7 +106,7 @@ export default function ScanScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#ffffff",
   },
   camera: {
     flex: 1,
@@ -105,17 +119,68 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
     alignItems: "center",
+    pointerEvents: "none", // Allow touches to pass through to stop button
   },
-  instruction: {
-    fontSize: 24,
+  instructionText: {
+    fontSize: 20,
     color: "#fff",
-    fontWeight: "bold",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    fontWeight: "600",
+    backgroundColor: "rgba(0,0,0,0.6)",
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
   },
-  text: {
-    fontSize: 18,
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+    padding: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#111827",
+    marginTop: 16,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#6b7280",
+    textAlign: "center",
+    maxWidth: 300,
+  },
+  scanButton: {
+    backgroundColor: "#228fc5",
+    paddingVertical: 18,
+    paddingHorizontal: 48,
+    borderRadius: 16,
+    marginTop: 24,
+  },
+  scanButtonText: {
     color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  bottomButtonContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  stopButton: {
+    backgroundColor: "#ef4444",
+    paddingVertical: 18,
+    paddingHorizontal: 48,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  stopButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });
