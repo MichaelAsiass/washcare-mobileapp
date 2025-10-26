@@ -15,23 +15,21 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,
 });
 
-export const unstable_settings = {
-  anchor: "(tabs)",
-};
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <ConvexProvider client={convex}>
-        <ClerkProvider tokenCache={tokenCache}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    <ClerkProvider tokenCache={tokenCache}>
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <ConvexProvider client={convex}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
           </Stack>
           <StatusBar style="auto" />
-        </ClerkProvider>
-      </ConvexProvider>
-    </ThemeProvider>
+        </ConvexProvider>
+      </ThemeProvider>
+    </ClerkProvider>
   );
 }

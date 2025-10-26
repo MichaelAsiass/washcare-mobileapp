@@ -7,7 +7,6 @@ import {
 } from "react-native";
 import { CheckCircle, XCircle, X } from "lucide-react-native";
 import { MembershipBadge } from "./membershipbadge";
-import { VisitStats } from "./visitstats";
 
 type ResultCardProps = {
   data: {

@@ -19,11 +19,13 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color }) => <House size={28} color={color} />,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
+          headerShown: false,
           title: "Account",
           tabBarIcon: ({ color }) => (
             <CircleUserRound size={28} color={color} />

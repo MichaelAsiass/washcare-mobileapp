@@ -1,177 +1,333 @@
-import * as React from 'react'
-import { Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native'
-import { useSignUp } from '@clerk/clerk-expo'
-import { useRouter } from 'expo-router'
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  Alert,
+} from "react-native";
+import { useSignUp } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
+import { Mail, Lock, User } from "lucide-react-native";
+import Input from "@/components/common/input";
+import Button from "@/components/common/button";
 
 export default function SignUpScreen() {
-  const { isLoaded, signUp, setActive } = useSignUp()
-  const router = useRouter()
+  const { isLoaded, signUp, setActive } = useSignUp();
+  const router = useRouter();
 
-  const [emailAddress, setEmailAddress] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [pendingVerification, setPendingVerification] = React.useState(false)
-  const [code, setCode] = React.useState('')
+  const [emailAddress, setEmailAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({
+    email: "",
+    password: "",
+    firstName: "",
+    lastName: "",
+    code: "",
+  });
+
+  // Add your logo - same as sign-in
+  const logo = require("@/assets/images/logo.png");
+
+  const validateSignUpForm = () => {
+    const newErrors = {
+      email: "",
+      password: "",
+      firstName: "",
+      lastName: "",
+      code: "",
+    };
+
+    if (!firstName) {
+      newErrors.firstName = "First name is required";
+    }
+
+    if (!lastName) {
+      newErrors.lastName = "Last name is required";
+    }
+
+    if (!emailAddress) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(emailAddress)) {
+      newErrors.email = "Please enter a valid email";
+    }
+
+    if (!password) {
+      newErrors.password = "Password is required";
+    } else if (password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
+    }
+
+    setErrors(newErrors);
+    return (
+      !newErrors.email &&
+      !newErrors.password &&
+      !newErrors.firstName &&
+      !newErrors.lastName
+    );
+  };
+
+  const validateVerificationForm = () => {
+    const newErrors = {
+      email: "",
+      password: "",
+      firstName: "",
+      lastName: "",
+      code: "",
+    };
+
+    if (!code) {
+      newErrors.code = "Verification code is required";
+    } else if (code.length < 6) {
+      newErrors.code = "Code must be 6 digits";
+    }
+
+    setErrors(newErrors);
+    return !newErrors.code;
+  };
 
   // Handle submission of sign-up form
   const onSignUpPress = async () => {
-    if (!isLoaded) return
+    if (!isLoaded || !validateSignUpForm()) return;
 
-    console.log(emailAddress, password)
+    setLoading(true);
 
     try {
       await signUp.create({
         emailAddress,
         password,
-      })
+        firstName,
+        lastName,
+      });
 
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
-      setPendingVerification(true)
-    } catch (err) {
-      console.error(JSON.stringify(err, null, 2))
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setPendingVerification(true);
+    } catch (err: any) {
+      Alert.alert(
+        "Error",
+        err.errors?.[0]?.message || "Something went wrong. Please try again."
+      );
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   // Handle submission of verification form
   const onVerifyPress = async () => {
-    if (!isLoaded) return
+    if (!isLoaded || !validateVerificationForm()) return;
+
+    setLoading(true);
 
     try {
       const signUpAttempt = await signUp.attemptEmailAddressVerification({
         code,
-      })
+      });
 
-      if (signUpAttempt.status === 'complete') {
-        await setActive({ session: signUpAttempt.createdSessionId })
-        router.replace('/')
+      if (signUpAttempt.status === "complete") {
+        await setActive({ session: signUpAttempt.createdSessionId });
+        router.replace("/(tabs)");
       } else {
-        console.error(JSON.stringify(signUpAttempt, null, 2))
+        Alert.alert("Error", "Verification failed. Please try again.");
       }
-    } catch (err) {
-      console.error(JSON.stringify(err, null, 2))
+    } catch (err: any) {
+      Alert.alert(
+        "Error",
+        err.errors?.[0]?.message ||
+          "Invalid verification code. Please try again."
+      );
+    } finally {
+      setLoading(false);
     }
-  }
-
-  // Navigate to sign-in screen
-  const navigateToSignIn = () => {
-    router.push('/sign-in')
-  }
+  };
 
   if (pendingVerification) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Verify your email</Text>
-        <Text style={styles.subtitle}>Check your email for the verification code</Text>
-        
-        <TextInput
-          value={code}
-          placeholder="Enter verification code"
-          onChangeText={setCode}
-          style={styles.input}
-          keyboardType="number-pad"
-        />
-        
-        <TouchableOpacity onPress={onVerifyPress} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Verify Email</Text>
-        </TouchableOpacity>
+        {/* Logo Section */}
+        <View style={styles.logoContainer}>
+          <Image source={logo} style={styles.logo} />
+          <Text style={styles.title}>Verify Your Email</Text>
+          <Text style={styles.subtitle}>
+            We sent a verification code to{"\n"}
+            <Text style={styles.emailText}>{emailAddress}</Text>
+          </Text>
+        </View>
+
+        {/* Verification Form */}
+        <View style={styles.formContainer}>
+          <Input
+            placeholder="Enter verification code"
+            value={code}
+            onChangeText={setCode}
+            keyboardType="numeric"
+            error={errors.code}
+            icon={<Lock size={20} color="#666" />}
+          />
+
+          <Button
+            title={loading ? "Verifying..." : "Verify Email"}
+            onPress={onVerifyPress}
+            loading={loading}
+            disabled={loading || !code}
+          />
+
+          <TouchableOpacity
+            style={styles.backToSignIn}
+            onPress={() => setPendingVerification(false)}
+          >
+            <Text style={styles.backToSignInText}>Back to sign up</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    )
+    );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
-      
-      <TextInput
-        autoCapitalize="none"
-        value={emailAddress}
-        placeholder="Enter email"
-        onChangeText={setEmailAddress}
-        style={styles.input}
-        keyboardType="email-address"
-      />
-      
-      <TextInput
-        value={password}
-        placeholder="Enter password"
-        secureTextEntry={true}
-        onChangeText={setPassword}
-        style={styles.input}
-      />
-      
-      <TouchableOpacity onPress={onSignUpPress} style={styles.primaryButton}>
-        <Text style={styles.primaryButtonText}>Create Account</Text>
-      </TouchableOpacity>
-      
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Already have an account?</Text>
-        <TouchableOpacity onPress={navigateToSignIn}>
-          <Text style={styles.linkText}>Sign in</Text>
+      {/* Logo Section */}
+      <View style={styles.logoContainer}>
+        <Image source={logo} style={styles.logo} />
+        <Text style={styles.title}>Create Account</Text>
+        <Text style={styles.subtitle}>Sign up to get started</Text>
+      </View>
+
+      {/* Form Section */}
+      <View style={styles.formContainer}>
+        <View style={styles.nameContainer}>
+          <View style={styles.nameInput}>
+            <Input
+              placeholder="First name"
+              value={firstName}
+              onChangeText={setFirstName}
+              error={errors.firstName}
+              icon={<User size={20} color="#666" />}
+            />
+          </View>
+          <View style={styles.nameSpacer} />
+          <View style={styles.nameInput}>
+            <Input
+              placeholder="Last name"
+              value={lastName}
+              onChangeText={setLastName}
+              error={errors.lastName}
+              icon={<User size={20} color="#666" />}
+            />
+          </View>
+        </View>
+
+        <Input
+          placeholder="Email"
+          value={emailAddress}
+          onChangeText={setEmailAddress}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          error={errors.email}
+          icon={<Mail size={20} color="#666" />}
+        />
+
+        <Input
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          error={errors.password}
+          icon={<Lock size={20} color="#666" />}
+        />
+
+        <Button
+          title={loading ? "Creating Account..." : "Create Account"}
+          onPress={onSignUpPress}
+          loading={loading}
+          disabled={
+            loading || !emailAddress || !password || !firstName || !lastName
+          }
+        />
+
+        {/* Sign In Link */}
+        <TouchableOpacity
+          style={styles.signInContainer}
+          onPress={() => router.push("/(auth)/sign-in")}
+        >
+          <Text style={styles.signInText}>
+            Already have an account?{" "}
+            <Text style={styles.signInLink}>Sign In</Text>
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 48,
+  },
+  logo: {
+    height: 120,
+    width: 120,
+    resizeMode: "contain",
+    marginBottom: 24,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
-    color: '#1a1a1a',
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#1a1a1a",
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    marginBottom: 30,
-    textAlign: 'center',
-    color: '#666',
+    color: "#666",
+    textAlign: "center",
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
-    marginBottom: 15,
-    borderRadius: 8,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
+  emailText: {
+    fontWeight: "600",
+    color: "#007AFF",
   },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 20,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  formContainer: {
+    width: "100%",
   },
-  primaryButtonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: 16,
+  nameContainer: {
+    flexDirection: "row",
+    marginBottom: 16,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 10,
+  nameInput: {
+    flex: 1,
   },
-  footerText: {
-    color: '#666',
+  nameSpacer: {
+    width: 12,
+  },
+  backToSignIn: {
+    alignItems: "center",
+    marginTop: 20,
+  },
+  backToSignInText: {
+    color: "#007AFF",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  signInContainer: {
+    alignItems: "center",
+    marginTop: 20,
+  },
+  signInText: {
+    color: "#666",
     fontSize: 14,
   },
-  linkText: {
-    color: '#007AFF',
-    fontWeight: 'bold',
-    fontSize: 14,
+  signInLink: {
+    color: "#007AFF",
+    fontWeight: "600",
   },
-})
+});

@@ -1,140 +1,186 @@
-import { useSignIn } from '@clerk/clerk-expo'
-import { useRouter } from 'expo-router'
-import { Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native'
-import React from 'react'
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  Alert,
+} from "react-native";
+import { useSignIn } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
+import { Mail, Lock } from "lucide-react-native";
+import Input from "@/components/common/input";
+import Button from "@/components/common/button";
 
 export default function SignInScreen() {
-  const { signIn, setActive, isLoaded } = useSignIn()
-  const router = useRouter()
+  const { signIn, setActive, isLoaded } = useSignIn();
+  const router = useRouter();
 
-  const [emailAddress, setEmailAddress] = React.useState('')
-  const [password, setPassword] = React.useState('')
+  const [emailAddress, setEmailAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({ email: "", password: "" });
 
-  // Handle the submission of the sign-in form
+  // Add your logo - update the path as needed
+  const logo = require("@/assets/images/logo.png");
+
+  const validateForm = () => {
+    const newErrors = { email: "", password: "" };
+
+    if (!emailAddress) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(emailAddress)) {
+      newErrors.email = "Please enter a valid email";
+    }
+
+    if (!password) {
+      newErrors.password = "Password is required";
+    }
+
+    setErrors(newErrors);
+    return !newErrors.email && !newErrors.password;
+  };
+
   const onSignInPress = async () => {
-    if (!isLoaded) return
+    if (!isLoaded || !validateForm()) return;
 
-    // Start the sign-in process using the email and password provided
+    setLoading(true);
+
     try {
       const signInAttempt = await signIn.create({
         identifier: emailAddress,
         password,
-      })
+      });
 
-      // If sign-in process is complete, set the created session as active
-      // and redirect the user
-      if (signInAttempt.status === 'complete') {
-        await setActive({ session: signInAttempt.createdSessionId })
-        router.replace('/')
+      if (signInAttempt.status === "complete") {
+        await setActive({ session: signInAttempt.createdSessionId });
+        router.replace("/(tabs)");
       } else {
-        // If the status isn't complete, check why. User might need to
-        // complete further steps.
-        console.error(JSON.stringify(signInAttempt, null, 2))
+        Alert.alert("Error", "Sign in failed. Please try again.");
       }
-    } catch (err) {
-      // See https://clerk.com/docs/guides/development/custom-flows/error-handling
-      // for more info on error handling
-      console.error(JSON.stringify(err, null, 2))
+    } catch (err: any) {
+      Alert.alert(
+        "Error",
+        err.errors?.[0]?.message ||
+          "Invalid email or password. Please try again."
+      );
+    } finally {
+      setLoading(false);
     }
-  }
-
-  // Navigate to sign-up screen
-  const navigateToSignUp = () => {
-    router.push('/sign-up')
-  }
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Sign in</Text>
-      
-      <TextInput
-        autoCapitalize="none"
-        value={emailAddress}
-        placeholder="Enter email"
-        onChangeText={setEmailAddress}
-        style={styles.input}
-      />
-      
-      <TextInput
-        value={password}
-        placeholder="Enter password"
-        secureTextEntry={true}
-        onChangeText={setPassword}
-        style={styles.input}
-      />
-      
-      <TouchableOpacity 
-        onPress={onSignInPress}
-        style={styles.primaryButton}
-      >
-        <Text style={styles.primaryButtonText}>Continue</Text>
-      </TouchableOpacity>
-      
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Don't have an account?</Text>
-        <TouchableOpacity onPress={navigateToSignUp}>
-          <Text style={styles.linkText}>Sign up</Text>
+      {/* Logo Section */}
+      <View style={styles.logoContainer}>
+        <Image source={logo} style={styles.logo} />
+        <Text style={styles.title}>Welcome Back</Text>
+        <Text style={styles.subtitle}>Sign in to your account</Text>
+      </View>
+
+      {/* Form Section */}
+      <View style={styles.formContainer}>
+        <Input
+          placeholder="Email"
+          value={emailAddress}
+          onChangeText={setEmailAddress}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          error={errors.email}
+          icon={<Mail size={20} color="#666" />}
+        />
+
+        <Input
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          error={errors.password}
+          icon={<Lock size={20} color="#666" />}
+        />
+
+        {/* Forgot Password */}
+        <TouchableOpacity
+          style={styles.forgotPassword}
+          onPress={() => router.push("/(auth)/forgotpassword")}
+        >
+          <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+        </TouchableOpacity>
+
+        {/* Sign In Button */}
+        <Button
+          title={loading ? "Signing In..." : "Sign In"}
+          onPress={onSignInPress}
+          loading={loading}
+          disabled={loading || !emailAddress || !password}
+        />
+
+        {/* Sign Up Link */}
+        <TouchableOpacity
+          style={styles.signUpContainer}
+          onPress={() => router.push("/(auth)/sign-up")}
+        >
+          <Text style={styles.signUpText}>
+            Don't have an account?{" "}
+            <Text style={styles.signUpLink}>Sign Up</Text>
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 48,
+  },
+  logo: {
+    height: 120,
+    width: 120,
+    resizeMode: "contain",
+    marginBottom: 24,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    textAlign: 'center',
-    color: '#1a1a1a',
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#1a1a1a",
+    marginBottom: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
-    marginBottom: 15,
-    borderRadius: 8,
+  subtitle: {
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    color: "#666",
+    textAlign: "center",
   },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 20,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  formContainer: {
+    width: "100%",
   },
-  primaryButtonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: 16,
+  forgotPassword: {
+    alignSelf: "flex-end",
+    marginBottom: 24,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 10,
+  forgotPasswordText: {
+    color: "#007AFF",
+    fontSize: 14,
+    fontWeight: "500",
   },
-  footerText: {
-    color: '#666',
+  signUpContainer: {
+    alignItems: "center",
+    marginTop: 20,
+  },
+  signUpText: {
+    color: "#666",
     fontSize: 14,
   },
-  linkText: {
-    color: '#007AFF',
-    fontWeight: 'bold',
-    fontSize: 14,
+  signUpLink: {
+    color: "#007AFF",
+    fontWeight: "600",
   },
 });
-//
