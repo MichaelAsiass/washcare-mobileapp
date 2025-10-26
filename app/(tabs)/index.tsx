@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../api";
+import { api } from "@/api";
 import { X, Sparkles, Zap } from "lucide-react-native";
 import { Logo } from "@/components/logo";
 import { ResultCard } from "@/components/home/resultcard";
